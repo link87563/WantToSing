@@ -2,7 +2,7 @@ name: Deploy WantToSing to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   deploy-to-github-pages:
