@@ -1,0 +1,137 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-6 px-4">
+    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.MicExternalOn" Size="Size.Large" Color="Color.Primary" Style="font-size: 3.5rem;" />
+        <MudText Typo="Typo.h4" Class="font-weight-bold" Color="Color.Primary">WantToSing</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">包廂點歌不翻車，微秒級聯想記事本</MudText>
+    </MudStack>
+
+    <MudAutocomplete T="SongItem" 
+                     @ref="_autocomplete"
+                     Label="輸入歌名或歌手（如：周杰倫、溫柔）" 
+                     Value="selectedSong"
+                     ValueChanged="OnSongSelected"
+                     SearchFunc="@SearchSongsInLocalMemory"
+                     ToStringFunc="@(s => s == null ? "" : $"{s.Title} - {s.Artist}")"
+                     ResetValueOnEmptyText="true"
+                     CoerceText="true"
+                     MinCharacters="1"
+                     Variant="Variant.Outlined"
+                     AdornmentIcon="@Icons.Material.Filled.Search"
+                     AdornmentColor="Color.Primary"
+                     Class="mb-4" />
+
+    @if (_selectedSongsList.Any())
+    {
+        <MudText Typo="Typo.h6" Class="mt-6 mb-2">我的點歌清單 (@_selectedSongsList.Count)</MudText>
+        <MudPaper Elevation="2">
+            <MudList T="SongItem" Clickable="true">
+                @foreach (var song in _selectedSongsList)
+                {
+                    <MudListItem Icon="@Icons.Material.Filled.MusicNote">
+                        <div class="d-flex align-center justify-space-between">
+                            <div>
+                                <MudText Typo="Typo.body1"><b>@song.Title</b></MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@song.Artist</MudText>
+                            </div>
+                            <div class="d-flex">
+                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" 
+                                               Color="Color.Primary" 
+                                               OnClick="@(() => CopyToClipboard(song))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
+                                               Color="Color.Error" 
+                                               OnClick="@(() => _selectedSongsList.Remove(song))" />
+                            </div>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private SongItem? selectedSong;
+    private MudAutocomplete<SongItem>? _autocomplete;
+    private List<SongItem> _localSongsCache = new();
+    private List<SongItem> _selectedSongsList = new();
+
+    public class SongItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Artist { get; set; } = string.Empty;
+        public string Shorthand { get; set; } = string.Empty; // 新增注音首字母縮寫
+    }
+
+    protected override void OnInitialized()
+    {
+        // 階段一：先用這 30 首核心台灣 KTV 經典芭樂歌打底，模擬本機全量快取
+        _localSongsCache = GetFirstVersionKtvSongs();
+    }
+
+    private Task<IEnumerable<SongItem>> SearchSongsInLocalMemory(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return Task.FromResult(Enumerable.Empty<SongItem>());
+
+        // 同時比對歌名、歌手與注音縮寫
+        var results = _localSongsCache
+            .Where(song => song.Title.Contains(value, StringComparison.OrdinalIgnoreCase) || 
+                           song.Artist.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                           song.Shorthand.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(10);
+
+        return Task.FromResult(results);
+    }
+
+    private async Task OnSongSelected(SongItem item)
+    {
+        if (item == null) return;
+
+        // 如果歌曲不在清單內，則加入（放在最上面）
+        if (!_selectedSongsList.Any(s => s.Title == item.Title && s.Artist == item.Artist))
+        {
+            _selectedSongsList.Insert(0, item);
+            Snackbar.Add($"已加入：{item.Title}", Severity.Info);
+        }
+        
+        // 強制清空 Autocomplete 的文字與選取狀態，讓使用者可以連續輸入
+        if (_autocomplete != null)
+        {
+            await _autocomplete.ResetAsync();
+        }
+    }
+
+    private async Task CopyToClipboard(SongItem song)
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", song.Title);
+        Snackbar.Add($"已複製「{song.Title}」", Severity.Success);
+    }
+
+    private List<SongItem> GetFirstVersionKtvSongs()
+    {
+        return new List<SongItem>
+        {
+            new() { Title = "溫柔", Artist = "五月天", Shorthand = "ㄨㄖㄨㄩㄊ" },
+            new() { Title = "傷心的人別聽慢歌", Artist = "五月天", Shorthand = "ㄙㄒㄉㄖㄅㄊㄇㄍㄨㄩㄊ" },
+            new() { Title = "晴天", Artist = "周杰倫", Shorthand = "ㄑㄊㄓㄐㄌ" },
+            new() { Title = "七里香", Artist = "周杰倫", Shorthand = "ㄑㄌㄒㄓㄐㄌ" },
+            new() { Title = "倒帶", Artist = "蔡依林", Shorthand = "ㄉㄉㄘㄧㄌ" },
+            new() { Title = "王妃", Artist = "蕭敬騰", Shorthand = "ㄨㄈㄒㄐㄊ" },
+            new() { Title = "新不了情", Artist = "蕭敬騰", Shorthand = "ㄒㄅㄌㄑㄒㄐㄊ" },
+            new() { Title = "小幸運", Artist = "田馥甄", Shorthand = "ㄒㄒㄩㄊㄈㄓ" },
+            new() { Title = "那些年", Artist = "胡夏", Shorthand = "ㄋㄒㄋㄏㄒ" },
+            new() { Title = "山海", Artist = "草東沒有派對", Shorthand = "ㄕㄏㄘㄉㄇㄧㄆㄉ" },
+            new() { Title = "浪子回頭", Artist = "茄子蛋", Shorthand = "ㄌㄗㄏㄊㄑㄗㄉ" },
+            new() { Title = "如果可以", Artist = "韋禮安", Shorthand = "ㄖㄍㄎㄧㄨㄌㄢ" },
+            new() { Title = "披星戴月的想你", Artist = "告五人", Shorthand = "ㄆㄒㄉㄩㄉㄒㄋㄍㄨㄖ" },
+            new() { Title = "愛人錯過", Artist = "告五人", Shorthand = "ㄞㄖㄘㄍㄍㄨㄖ" },
+            new() { Title = "孤勇者", Artist = "陳奕迅", Shorthand = "ㄍㄩㄓㄔㄧㄒ" },
+            new() { Title = "修煉愛情", Artist = "林俊傑", Shorthand = "ㄒㄌㄞㄑㄌㄐㄐ" },
+            new() { Title = "慢冷", Artist = "梁靜茹", Shorthand = "ㄇㄌㄌㄐㄖ" }
+        };
+    }
+}
