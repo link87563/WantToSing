@@ -1,8 +1,9 @@
 name: Deploy WantToSing to GitHub Pages
 
 on:
-  push:
-    branches: [ master, main ] # 確保 main 或 master 分支推送時都會觸發
+  workflow_dispatch: # 允許手動觸發工作流程
+  # push:
+    # branches: [ master, main ] # 確保 main 或 master 分支推送時都會觸發
 
 jobs:
   deploy-to-github-pages:
