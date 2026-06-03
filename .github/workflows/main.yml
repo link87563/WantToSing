@@ -2,7 +2,7 @@ name: Deploy WantToSing to GitHub Pages
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ] # 確保 main 或 master 分支推送時都會觸發
 
 jobs:
   deploy-to-github-pages:
@@ -13,14 +13,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.x' # 必須與你的 .csproj (net10.0) 匹配
 
       - name: Publish .NET Core Project
         run: dotnet publish WantToSing.csproj -c Release -o release --nologo
-
-      # 自動修正發佈後的 base href，確保線上版本正確指向子目錄
-      - name: Fix base href for GitHub Pages
-        run: sed -i 's/<base href="\/" \/>/<base href="\/WantToSing\/" \/>/g' release/wwwroot/index.html
 
       # 解決 GitHub Pages 不支援 SPA 路由的問題
       - name: Copy index.html to 404.html
